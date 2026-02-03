@@ -23,6 +23,7 @@
     "@opentelemetry/instrumentation-http": "^0.37.0",
     "@opentelemetry/instrumentation-express": "^0.37.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.37.0"
+    ,"@opentelemetry/semantic-conventions": "^1.16.0"
   },
   "devDependencies": {
     "tsx": "^4.21.0",
