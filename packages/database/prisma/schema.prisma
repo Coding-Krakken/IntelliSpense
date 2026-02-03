@@ -15,12 +15,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
 }
-// NOTE: Prisma expects the datasource `url` to be set. Use the
-// `DATABASE_URL` environment variable at runtime and in CI.
-// Example (already used by migration scripts):
-// url = env("DATABASE_URL")
+// NOTE: Prisma v7 moves runtime connection configuration out of
+// the schema file. Provide `DATABASE_URL` via `prisma.config.ts`,
+// environment variables, or pass an `adapter`/`accelerateUrl` to
+// the `PrismaClient` constructor. See https://pris.ly/d/config-datasource
+// for details.
 
 // =================================================================
 // ORGANIZATIONS & USERS
