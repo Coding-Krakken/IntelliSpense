@@ -27,6 +27,10 @@ fi
 
 echo "Safe target detected. Running non-interactive Prisma reset..."
 
+# Ensure Prisma CLI knows where to read runtime config (Prisma v7)
+PRISMA_CONFIG_PATH=${PRISMA_CONFIG_PATH:-"$PWD/packages/database/prisma/prisma.config.js"}
+export PRISMA_CONFIG_PATH
+
 # Use pnpm exec so package scripts arg forwarding is not required
 pnpm --filter @intellispense/database exec prisma migrate reset --force
 

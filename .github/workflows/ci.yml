@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, feature/* ]
+    branches: [ main, feature/*, feature/reference-stack ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, feature/*, feature/reference-stack ]
 
 jobs:
   build:
@@ -28,13 +28,15 @@ jobs:
       - name: Setup pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@latest --activate
+          corepack prepare pnpm@8.15.0 --activate
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         env:
           # Provide a sensible DATABASE_URL for Prisma config validation.
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
+          # Point Prisma CLI at the runtime config file so v7 picks up datasources
+          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: pnpm -w -F @intellispense/database db:generate
       - name: Run lint and typecheck
         run: pnpm -w -r run typecheck
@@ -57,6 +59,7 @@ jobs:
       - name: Prepare test DB (safe reset)
         env:
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
+          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: |
           echo "Running safe test DB reset"
           chmod +x ./scripts/ensure_test_db.sh
@@ -64,6 +67,7 @@ jobs:
       - name: Run DB migrations (ci)
         env:
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
+          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: |
           # Run migrations from the package directory so Prisma picks up package-root prisma.config
           pushd packages/database
