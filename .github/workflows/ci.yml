@@ -21,6 +21,8 @@ jobs:
           corepack prepare pnpm@latest --activate
       - name: Install dependencies
         run: pnpm install
+      - name: Generate Prisma client
+        run: pnpm -w -F @intellispense/database db:generate
       - name: Run lint and typecheck
         run: pnpm -w -r run typecheck
       - name: Build packages
