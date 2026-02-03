@@ -36,7 +36,19 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PRISMA_CONFIG_PATH=${PRISMA_CONFIG_PATH:-"$REPO_ROOT/packages/database/prisma/prisma.config.js"}
 export PRISMA_CONFIG_PATH
 
-# Use pnpm exec so package scripts arg forwarding is not required
-pnpm --filter @intellispense/database exec prisma migrate reset --force
+# Echo key info for CI debugging (safe to redact by runners)
+echo "PRISMA_CONFIG_PATH=$PRISMA_CONFIG_PATH"
+echo "DATABASE_URL=$DATABASE_URL"
+
+# Run Prisma commands from the package directory so the runtime config and
+# relative schema path are resolved consistently by the Prisma CLI.
+pushd "$REPO_ROOT/packages/database" >/dev/null
+
+# Use the package-local Prisma CLI. Pass the explicit schema path to avoid
+# ambiguity and ensure Prisma reads the runtime config pointed to by
+# PRISMA_CONFIG_PATH.
+pnpm exec -- prisma migrate reset --force --schema=./prisma/schema.prisma
+
+popd >/dev/null
 
 echo "Database reset complete."
