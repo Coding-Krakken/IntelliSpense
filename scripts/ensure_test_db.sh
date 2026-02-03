@@ -27,8 +27,13 @@ fi
 
 echo "Safe target detected. Running non-interactive Prisma reset..."
 
-# Ensure Prisma CLI knows where to read runtime config (Prisma v7)
-PRISMA_CONFIG_PATH=${PRISMA_CONFIG_PATH:-"$PWD/packages/database/prisma/prisma.config.js"}
+# Compute an absolute path to the repo root (script is in ./scripts)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Ensure Prisma CLI knows where to read runtime config (Prisma v7).
+# Prefer an already-set PRISMA_CONFIG_PATH, otherwise point to the simple JS runtime config.
+PRISMA_CONFIG_PATH=${PRISMA_CONFIG_PATH:-"$REPO_ROOT/packages/database/prisma/prisma.config.js"}
 export PRISMA_CONFIG_PATH
 
 # Use pnpm exec so package scripts arg forwarding is not required
