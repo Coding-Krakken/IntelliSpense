@@ -1,3 +1,6 @@
+// optional native dependency used only for local SQLite fallback — skip
+// TypeScript resolution in CI
+// @ts-ignore: optional dependency
 import Database from 'better-sqlite3'
 import path from 'path'
 
