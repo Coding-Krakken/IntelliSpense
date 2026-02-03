@@ -6,12 +6,16 @@ const { spawnSync, spawn } = require('child_process')
 module.exports = async () => {
   const root = process.cwd()
   const artifactsPath = path.join(root, 'e2e', 'artifacts.json')
-  console.log('E2E global-setup: using docker-compose to start Postgres and Redis')
+  console.log('E2E global-setup: starting Postgres and Redis using docker compose')
 
-  // Fallback to docker-compose for local/dev E2E (more predictable in CI environments)
-  const up = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', 'up', '-d'], { stdio: 'inherit' })
+  // Prefer `docker compose` (modern CLI). Fall back to `docker-compose` if not available.
+  let up = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d'], { stdio: 'inherit' })
   if (up.status !== 0) {
-    console.error('docker-compose up failed')
+    console.warn('`docker compose` failed, falling back to `docker-compose`')
+    up = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', 'up', '-d'], { stdio: 'inherit' })
+  }
+  if (up.status !== 0) {
+    console.error('docker compose / docker-compose up failed')
     process.exit(1)
   }
 
