@@ -9,3 +9,6 @@ module.exports = {
     }
   }
 }
+
+// Backwards-compatible alias for tools expecting a singular `datasource` key
+module.exports.datasource = module.exports.datasources.db
