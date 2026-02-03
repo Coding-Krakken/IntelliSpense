@@ -43,7 +43,7 @@ IntelliSpense eliminates Excel-based profitability tracking for project-based bu
 
 ```bash
 # Clone the repository
-git clone https://github.com/intellispense/intellispense.git
+git clone https://github.com/Intellispense.git
 cd intellispense
 
 # Install dependencies
