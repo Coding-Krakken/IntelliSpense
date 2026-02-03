@@ -42,9 +42,10 @@ jobs:
         run: pnpm -w -r run build
       - name: Run unit tests
         run: pnpm -w -r run test || true
-      - name: Start docker-compose services for E2E
+      - name: Start docker compose services for E2E
         run: |
-          docker-compose -f docker-compose.dev.yml up -d --remove-orphans
+          # Use Docker Compose v2 cli available on runners as `docker compose`
+          docker compose -f docker-compose.dev.yml up -d --remove-orphans
       - name: Wait for Postgres
         run: |
           for i in {1..30}; do
