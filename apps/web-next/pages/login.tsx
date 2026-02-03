@@ -8,7 +8,9 @@ const schema = z.object({ email: z.string().email(), password: z.string().min(6)
 
 export default function Login() {
   const router = useRouter()
-  const { register, handleSubmit, formState } = useForm({ resolver: zodResolver(schema) })
+  // `zodResolver` typings can be strict for some zod versions; cast schema to `any`
+  // to avoid build-time type incompatibilities in CI/dev without changing deps.
+  const { register, handleSubmit, formState } = useForm({ resolver: zodResolver(schema as any) })
 
   const onSubmit = async (data: any) => {
     try {

@@ -15,7 +15,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url = env("DATABASE_URL")
 }
+// NOTE: Prisma expects the datasource `url` to be set. Use the
+// `DATABASE_URL` environment variable at runtime and in CI.
+// Example (already used by migration scripts):
+// url = env("DATABASE_URL")
 
 // =================================================================
 // ORGANIZATIONS & USERS
@@ -69,9 +74,26 @@ model User {
   createdEvents   FinancialEvent[]  @relation("EventCreator")
   managedProjects Project[]         @relation("ProjectManager")
   auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
 
   @@index([email])
   @@map("users")
+}
+
+// Refresh tokens for long-lived sessions. Stored hashed for safety.
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  replacedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model OrganizationMembership {

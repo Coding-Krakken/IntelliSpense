@@ -13,6 +13,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "e2e": "playwright test",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "typecheck": "turbo typecheck",
@@ -28,11 +29,15 @@
     "prepare": "husky install"
   },
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@types/express": "^4.17.21",
     "@types/node": "^25.2.0",
     "@types/pg": "^8.16.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "supertest": "^7.2.2",
+    "testcontainers": "^9.2.0",
     "turbo": "^1.13.4",
     "typescript": "^5.9.3"
   },
