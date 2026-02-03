@@ -32,10 +32,11 @@ module.exports = async () => {
   if (process.env.SKIP_DB_MIGRATIONS === 'true') {
     console.log('E2E global-setup: SKIP_DB_MIGRATIONS=true, skipping migrations')
   } else {
-    console.log('E2E global-setup: running migrations')
-    const migrate = spawnSync('pnpm', ['--filter', '@intellispense/database', 'db:migrate'], { env: { ...process.env, DATABASE_URL }, stdio: 'inherit' })
-    if (migrate.status !== 0) {
-      console.error('Migrations failed')
+    console.log('E2E global-setup: ensuring a clean test database (prisma migrate reset --force)')
+    // Reset the database non-interactively to ensure tests run against a clean schema.
+    const reset = spawnSync('pnpm', ['--filter', '@intellispense/database', 'exec', 'prisma', 'migrate', 'reset', '--force'], { env: { ...process.env, DATABASE_URL }, stdio: 'inherit' })
+    if (reset.status !== 0) {
+      console.error('Database reset/migrations failed')
       process.exit(1)
     }
   }
