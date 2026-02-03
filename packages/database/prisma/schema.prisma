@@ -1,0 +1,606 @@
+// IntelliSpense Database Schema
+// Based on: SYSTEM_MODEL.md
+// Last Updated: 2026-02-03
+// 
+// Core Principles:
+// 1. Event-sourced: FinancialEvent table is append-only, immutable
+// 2. Multi-tenant: Every entity has organizationId for data isolation
+// 3. Temporal queries: validFrom/validTo for point-in-time profitability
+// 4. Audit trail: AuditLog table tracks all sensitive actions
+//
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =================================================================
+// ORGANIZATIONS & USERS
+// =================================================================
+
+model Organization {
+  id                 String   @id @default(uuid())
+  name               String
+  slug               String   @unique
+  industry           Industry @default(OTHER)
+  size               OrganizationSize @default(SOLO)
+  settings           Json     @default("{}")
+  subscriptionTier   SubscriptionTier @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relationships
+  memberships       OrganizationMembership[]
+  projects          Project[]
+  clients           Client[]
+  employees         Employee[]
+  costCenters       CostCenter[]
+  financialEvents   FinancialEvent[]
+  integrations      Integration[]
+  aiDecisions       AIDecision[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  name            String
+  avatarUrl       String?
+  authProvider    AuthProvider @default(EMAIL)
+  authProviderId  String?
+  emailVerified   Boolean  @default(false)
+  mfaEnabled      Boolean  @default(false)
+  mfaSecret       String?  // Encrypted
+  passwordHash    String?  // Nullable for OAuth users
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  memberships     OrganizationMembership[]
+  createdEvents   FinancialEvent[]  @relation("EventCreator")
+  managedProjects Project[]         @relation("ProjectManager")
+  auditLogs       AuditLog[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model OrganizationMembership {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  role           Role     @default(VIEWER)
+  permissions    Json     @default("[]")  // Array of granular permissions
+  invitedBy      String?
+  invitedAt      DateTime?
+  joinedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
+// =================================================================
+// PROJECTS & TASKS
+// =================================================================
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  code           String?       // User-defined identifier
+  clientId       String?
+  status         ProjectStatus @default(PLANNED)
+  startDate      DateTime?
+  endDate        DateTime?
+  budget         Decimal?      @db.Decimal(19, 4)
+  description    String?       @db.Text
+  metadata       Json          @default("{}")
+  managerId      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  completedAt    DateTime?
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client         Client?      @relation(fields: [clientId], references: [id])
+  manager        User?        @relation("ProjectManager", fields: [managerId], references: [id])
+  tasks          Task[]
+  financialEvents FinancialEvent[]
+  profitabilitySnapshots ProjectProfitabilitySnapshot[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([clientId])
+  @@map("projects")
+}
+
+model Task {
+  id              String     @id @default(uuid())
+  projectId       String
+  parentTaskId    String?
+  name            String
+  description     String?    @db.Text
+  phase           String?
+  estimatedHours  Decimal?   @db.Decimal(10, 2)
+  estimatedCost   Decimal?   @db.Decimal(19, 4)
+  startDate       DateTime?
+  endDate         DateTime?
+  status          TaskStatus @default(NOT_STARTED)
+  sortOrder       Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relationships
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask     Task?    @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  childTasks     Task[]   @relation("TaskHierarchy")
+  financialEvents FinancialEvent[]
+
+  @@index([projectId, status])
+  @@index([parentTaskId])
+  @@map("tasks")
+}
+
+model Client {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  code            String?
+  industry        Industry?
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  address         Json?
+  billingAddress  Json?
+  paymentTerms    String?
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects       Project[]
+  financialEvents FinancialEvent[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("clients")
+}
+
+model Employee {
+  id              String         @id @default(uuid())
+  organizationId  String
+  userId          String?        // Link to User if employee is also a system user
+  name            String
+  employeeCode    String?
+  role            String?
+  department      String?
+  hourlyRate      Decimal?       @db.Decimal(10, 2)
+  overtimeRate    Decimal?       @db.Decimal(10, 2)
+  hireDate        DateTime?
+  terminationDate DateTime?
+  status          EmployeeStatus @default(ACTIVE)
+  metadata        Json           @default("{}")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  financialEvents FinancialEvent[]
+
+  @@index([organizationId, status])
+  @@map("employees")
+}
+
+model CostCenter {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  type            CostCenterType @default(OVERHEAD)
+  allocationRule  Json     // { method: "EQUAL" | "REVENUE_BASED" | "LABOR_HOURS" | "CUSTOM_FORMULA", parameters: {...} }
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  financialEvents FinancialEvent[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("cost_centers")
+}
+
+// =================================================================
+// FINANCIAL EVENTS (Event-Sourced, Immutable)
+// =================================================================
+
+model FinancialEvent {
+  id              String            @id @default(uuid())
+  organizationId  String
+  eventType       FinancialEventType
+  timestamp       DateTime
+  amount          Decimal           @db.Decimal(19, 4)  // 4 decimal precision for fractional cents
+  currency        String            @default("USD")
+  projectId       String?
+  taskId          String?
+  employeeId      String?
+  clientId        String?
+  costCenterId    String?
+  description     String
+  metadata        Json              @default("{}")
+  sourceSystem    String
+  sourceId        String
+  correctsEventId String?           // For ADJUSTMENT events
+  validFrom       DateTime          @default(now())
+  validTo         DateTime?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  version         Int               @default(1)
+
+  // Relationships
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id])
+  task           Task?        @relation(fields: [taskId], references: [id])
+  employee       Employee?    @relation(fields: [employeeId], references: [id])
+  client         Client?      @relation(fields: [clientId], references: [id])
+  costCenter     CostCenter?  @relation(fields: [costCenterId], references: [id])
+  creator        User         @relation("EventCreator", fields: [createdBy], references: [id])
+  correctsEvent  FinancialEvent?  @relation("EventCorrection", fields: [correctsEventId], references: [id])
+  corrections    FinancialEvent[] @relation("EventCorrection")
+  aiDecision     AIDecision?  @relation(fields: [aiDecisionId], references: [id])
+  aiDecisionId   String?
+
+  @@unique([organizationId, sourceSystem, sourceId])
+  @@index([organizationId, projectId, timestamp])
+  @@index([organizationId, eventType, timestamp])
+  @@index([projectId, validFrom, validTo])
+  @@index([sourceSystem, sourceId])
+  @@map("financial_events")
+}
+
+model ProjectProfitabilitySnapshot {
+  id                     String   @id @default(uuid())
+  projectId              String
+  calculatedAt           DateTime @default(now())
+  asOfDate               DateTime
+  totalRevenue           Decimal  @db.Decimal(19, 4)
+  totalLaborCost         Decimal  @db.Decimal(19, 4)
+  totalMaterialCost      Decimal  @db.Decimal(19, 4)
+  totalOverheadCost      Decimal  @db.Decimal(19, 4)
+  totalEquipmentCost     Decimal  @db.Decimal(19, 4)
+  totalSubcontractorCost Decimal  @db.Decimal(19, 4)
+  totalCosts             Decimal  @db.Decimal(19, 4)
+  margin                 Decimal  @db.Decimal(19, 4)
+  marginPercentage       Decimal? @db.Decimal(10, 4)
+  eventCount             Int
+  lastEventId            String?
+
+  // Relationships
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, asOfDate])
+  @@index([projectId, calculatedAt])
+  @@map("project_profitability_snapshots")
+}
+
+// =================================================================
+// INTEGRATIONS
+// =================================================================
+
+model Integration {
+  id               String            @id @default(uuid())
+  organizationId   String
+  type             IntegrationType
+  name             String
+  status           IntegrationStatus @default(PENDING_AUTH)
+  credentials      Json              // Encrypted OAuth tokens, API keys
+  configuration    Json              @default("{}")
+  lastSyncAt       DateTime?
+  lastSyncStatus   SyncStatus?
+  errorMessage     String?           @db.Text
+  createdBy        String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncLogs     SyncLog[]
+
+  @@unique([organizationId, type])
+  @@index([organizationId, status])
+  @@map("integrations")
+}
+
+model SyncLog {
+  id             String     @id @default(uuid())
+  integrationId  String
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+  status         SyncStatus @default(RUNNING)
+  direction      SyncDirection
+  syncType       SyncType
+  recordsSynced  Int        @default(0)
+  recordsFailed  Int        @default(0)
+  errors         Json       @default("[]")
+  metadata       Json       @default("{}")
+
+  // Relationships
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId, startedAt])
+  @@map("sync_logs")
+}
+
+// =================================================================
+// AI DECISIONS & AUDIT
+// =================================================================
+
+model AIDecision {
+  id              String           @id @default(uuid())
+  organizationId  String
+  decisionType    AIDecisionType
+  inputContext    Json
+  output          Json
+  modelVersion    String
+  modelProvider   AIModelProvider  @default(ANTHROPIC)
+  promptVersion   String?
+  latencyMs       Int?
+  tokenCount      Int?
+  userReview      UserReview?
+  userFeedback    String?          @db.Text
+  createdAt       DateTime         @default(now())
+
+  // Relationships
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appliedEvents   FinancialEvent[]
+
+  @@index([organizationId, decisionType, createdAt])
+  @@index([userReview])
+  @@map("ai_decisions")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         String
+  entityType     String?
+  entityId       String?
+  changes        Json?
+  ipAddress      String?
+  userAgent      String?
+  result         AuditResult
+  failureReason  String?  @db.Text
+  timestamp      DateTime @default(now())
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, timestamp])
+  @@index([userId, timestamp])
+  @@index([action, timestamp])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id                String             @id @default(uuid())
+  organizationId    String
+  userId            String?
+  type              NotificationType
+  priority          NotificationPriority @default(MEDIUM)
+  title             String
+  message           String             @db.Text
+  actionUrl         String?
+  relatedEntityType String?
+  relatedEntityId   String?
+  status            NotificationStatus @default(UNREAD)
+  deliveryChannels  Json               @default("[]")
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime           @default(now())
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// =================================================================
+// ENUMS
+// =================================================================
+
+enum Industry {
+  CONSTRUCTION
+  CONSULTING
+  AGENCY
+  SAAS
+  RETAIL
+  MANUFACTURING
+  OTHER
+}
+
+enum OrganizationSize {
+  SOLO          // 1-5 employees
+  SMALL         // 6-50
+  MEDIUM        // 51-250
+  LARGE         // 251-1000
+  ENTERPRISE    // 1000+
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  MICROSOFT
+  OKTA
+  SAML
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  PROJECT_MANAGER
+  ACCOUNTANT
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum CostCenterType {
+  OVERHEAD
+  ADMINISTRATIVE
+  EQUIPMENT
+  FACILITY
+  OTHER
+}
+
+enum FinancialEventType {
+  REVENUE
+  LABOR_COST
+  MATERIAL_COST
+  OVERHEAD_COST
+  EQUIPMENT_COST
+  SUBCONTRACTOR_COST
+  ADJUSTMENT
+  FORECAST
+}
+
+enum IntegrationType {
+  QUICKBOOKS
+  XERO
+  TOGGL
+  HARVEST
+  PLAID
+  GUSTO
+  ADP
+  PROCORE
+  STRIPE
+  GENERIC_OAUTH
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  PENDING_AUTH
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum SyncDirection {
+  PULL  // External → IntelliSpense
+  PUSH  // IntelliSpense → External
+}
+
+enum SyncType {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum AIDecisionType {
+  COST_ATTRIBUTION
+  EXPLANATION
+  FORECAST
+  ANOMALY_DETECTION
+  RECOMMENDATION
+}
+
+enum AIModelProvider {
+  ANTHROPIC
+  OPENAI
+  GOOGLE
+  LOCAL
+}
+
+enum UserReview {
+  APPROVED
+  REJECTED
+  MODIFIED
+  PENDING
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+}
+
+enum NotificationType {
+  MARGIN_ALERT
+  BUDGET_EXCEEDED
+  ANOMALY_DETECTED
+  INTEGRATION_FAILED
+  INVOICE_DUE
+  SYNC_COMPLETE
+}
+
+enum NotificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  DISMISSED
+  ACTIONED
+}
