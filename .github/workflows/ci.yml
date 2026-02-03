@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
+        env:
+          # Provide a sensible DATABASE_URL for Prisma config validation.
+          DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
         run: pnpm -w -F @intellispense/database db:generate
       - name: Run lint and typecheck
         run: pnpm -w -r run typecheck
