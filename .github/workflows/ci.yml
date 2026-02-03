@@ -57,7 +57,11 @@ jobs:
       - name: Run DB migrations (ci)
         env:
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
-        run: pnpm -w -F @intellispense/database db:migrate:deploy
+        run: |
+          # Run migrations from the package directory so Prisma picks up package-root prisma.config
+          pushd packages/database
+          pnpm db:migrate:deploy
+          popd
       - name: Build production packages for E2E
         run: pnpm -w -r run build
       - name: Start API and web servers (background)
