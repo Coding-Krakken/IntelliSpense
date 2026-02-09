@@ -33,17 +33,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         env:
-          # Provide a sensible DATABASE_URL for Prisma config validation.
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
-          # Point Prisma CLI at the runtime config file so v7 picks up datasources
-          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: pnpm -w -F @intellispense/database db:generate
       - name: Run lint and typecheck
         run: pnpm -w -r run typecheck
       - name: Build packages
         run: pnpm -w -r run build
       - name: Run unit tests
-        run: pnpm -w -r run test || true
+        run: pnpm -w test
       - name: Start docker compose services for E2E
         run: |
           # Use Docker Compose v2 cli available on runners as `docker compose`
@@ -59,7 +56,6 @@ jobs:
       - name: Prepare test DB (safe reset)
         env:
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
-          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: |
           echo "Running safe test DB reset"
           chmod +x ./scripts/ensure_test_db.sh
@@ -67,7 +63,6 @@ jobs:
       - name: Run DB migrations (ci)
         env:
           DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
-          PRISMA_CONFIG_PATH: ${{ github.workspace }}/packages/database/prisma/prisma.config.js
         run: |
           # Run migrations from the package directory so Prisma picks up package-root prisma.config
           pushd packages/database
@@ -77,7 +72,7 @@ jobs:
         run: pnpm -w -r run build
       - name: Start API and web servers (background)
         env:
-          DATABASE_URL: postgresql://intellispense:intellispense_dev_password@postgres:5432/intellispense_dev
+          DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
         run: |
           pnpm -w -F @intellispense/api start &
           PORT=3001 pnpm -w -F @intellispense/web-next start &

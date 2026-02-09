@@ -28,16 +28,29 @@ module.exports = async () => {
   const DATABASE_URL = `postgresql://intellispense:intellispense_dev_password@${pgHost}:${pgPort}/intellispense_dev`
   const REDIS_URL = `redis://${redisHost}:${redisPort}`
 
-  // Run migrations (run directly in the database package so env is respected)
+  // Run migrations (use deploy for deterministic, non-interactive behavior)
   if (process.env.SKIP_DB_MIGRATIONS === 'true') {
     console.log('E2E global-setup: SKIP_DB_MIGRATIONS=true, skipping migrations')
   } else {
     console.log('E2E global-setup: running migrations')
-    const migrate = spawnSync('pnpm', ['--filter', '@intellispense/database', 'db:migrate'], { env: { ...process.env, DATABASE_URL }, stdio: 'inherit' })
+    const migrate = spawnSync('pnpm', ['--filter', '@intellispense/database', 'db:migrate:deploy'], { env: { ...process.env, DATABASE_URL }, stdio: 'inherit' })
     if (migrate.status !== 0) {
       console.error('Migrations failed')
       process.exit(1)
     }
+  }
+
+  // Ensure production builds exist (API start needs dist/, Next start needs .next/)
+  console.log('E2E global-setup: ensuring production builds')
+  const buildApi = spawnSync('pnpm', ['-w', '-F', '@intellispense/api', 'build'], { env: { ...process.env }, stdio: 'inherit' })
+  if (buildApi.status !== 0) {
+    console.error('API build failed')
+    process.exit(1)
+  }
+  const buildWeb = spawnSync('pnpm', ['-w', '-F', '@intellispense/web-next', 'build'], { env: { ...process.env }, stdio: 'inherit' })
+  if (buildWeb.status !== 0) {
+    console.error('Web build failed')
+    process.exit(1)
   }
 
   // Start API and web servers (capture logs)

@@ -1,11 +1,15 @@
 // Minimal Prisma v7 configuration to provide datasource URLs at runtime.
 // Prisma will prefer TS config if available; a plain JS file is the safest
 // fallback for CI environments.
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL must be set for Prisma datasource configuration')
+}
+
 module.exports = {
   datasources: {
     db: {
-      // Prefer env var, fall back to a local sqlite file for offline operations.
-      url: process.env.DATABASE_URL || 'file:./dev.db'
+      url: databaseUrl
     }
   }
 }

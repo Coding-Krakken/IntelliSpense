@@ -31,13 +31,6 @@ echo "Safe target detected. Running non-interactive Prisma reset..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Ensure Prisma CLI knows where to read runtime config (Prisma v7).
-# Prefer an already-set PRISMA_CONFIG_PATH, otherwise point to the simple JS runtime config.
-PRISMA_CONFIG_PATH=${PRISMA_CONFIG_PATH:-"$REPO_ROOT/packages/database/prisma/prisma.config.js"}
-export PRISMA_CONFIG_PATH
-
-# Echo key info for CI debugging (safe to redact by runners)
-echo "PRISMA_CONFIG_PATH=$PRISMA_CONFIG_PATH"
 echo "DATABASE_URL=$DATABASE_URL"
 
 # Run Prisma commands from the package directory so the runtime config and

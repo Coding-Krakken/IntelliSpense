@@ -16,11 +16,9 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-// NOTE: Prisma v7 moves runtime connection configuration out of
-// the schema file. Provide `DATABASE_URL` via `prisma.config.ts`,
-// environment variables, or pass an `adapter`/`accelerateUrl` to
-// the `PrismaClient` constructor. See https://pris.ly/d/config-datasource
-// for details.
+
+// NOTE: Prisma v7 moves runtime datasource configuration out of the schema.
+// Provide `DATABASE_URL` via `packages/database/prisma.config.ts` (or env).
 
 // =================================================================
 // ORGANIZATIONS & USERS
