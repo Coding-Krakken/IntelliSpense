@@ -1,25 +1,19 @@
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
-// require Resource at runtime to avoid TS value/type-only mismatch
-const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions')
-const ResourceModule = require('@opentelemetry/resources')
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
 
 const exporterEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || ''
 const serviceName = process.env.OTEL_SERVICE_NAME || 'intellispense-api'
 
-let resource: any
-// Support multiple OpenTelemetry versions: prefer Resource.create, then constructor
-if (ResourceModule && typeof ResourceModule.create === 'function') {
-  resource = ResourceModule.create({ [SemanticResourceAttributes.SERVICE_NAME]: serviceName })
-} else if (ResourceModule && ResourceModule.Resource && typeof ResourceModule.Resource === 'function') {
-  resource = new ResourceModule.Resource({ [SemanticResourceAttributes.SERVICE_NAME]: serviceName })
-} else if (ResourceModule && typeof ResourceModule === 'function') {
-  // some builds export the constructor directly
-  resource = new ResourceModule({ [SemanticResourceAttributes.SERVICE_NAME]: serviceName })
-} else {
-  resource = undefined
-}
+// Avoid importing @opentelemetry/resources directly to prevent duplicate versions
+// in the dependency graph (which causes TS type incompatibilities on private fields).
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { Resource } = require('@opentelemetry/resources')
+
+const resource = new Resource({
+  [SemanticResourceAttributes.SERVICE_NAME]: serviceName
+})
 
 const sdk = new NodeSDK({
   resource,

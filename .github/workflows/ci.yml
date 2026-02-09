@@ -77,12 +77,19 @@ jobs:
           pnpm -w -F @intellispense/api start &
           PORT=3001 pnpm -w -F @intellispense/web-next start &
           # wait for servers to boot
+          servers_up=0
           for i in {1..30}; do
             if curl -sS --fail http://localhost:4000/api/health >/dev/null 2>&1 && curl -sS --fail http://localhost:3001/ >/dev/null 2>&1; then
-              echo "servers up"; break
+              echo "servers up";
+              servers_up=1
+              break
             fi
             sleep 1
           done
+          if [ "$servers_up" -ne 1 ]; then
+            echo "ERROR: API and/or web server failed to start within 30 seconds" >&2
+            exit 1
+          fi
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
       - name: Run Playwright E2E

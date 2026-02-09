@@ -1,6 +1,5 @@
 const fs = require('fs')
 const path = require('path')
-const { GenericContainer } = require('testcontainers')
 const { spawnSync, spawn } = require('child_process')
 
 module.exports = async () => {
@@ -22,11 +21,7 @@ module.exports = async () => {
   // Wait briefly for services to be reachable on localhost
   const pgHost = 'localhost'
   const pgPort = 5432
-  const redisHost = 'localhost'
-  const redisPort = 6379
-
   const DATABASE_URL = `postgresql://intellispense:intellispense_dev_password@${pgHost}:${pgPort}/intellispense_dev`
-  const REDIS_URL = `redis://${redisHost}:${redisPort}`
 
   // Run migrations (use deploy for deterministic, non-interactive behavior)
   if (process.env.SKIP_DB_MIGRATIONS === 'true') {
@@ -66,6 +61,14 @@ module.exports = async () => {
   const apiProc = spawn('pnpm', ['-w', '-F', '@intellispense/api', 'start'], { env: { ...process.env, DATABASE_URL, PORT: '4000' }, detached: false, stdio: ['ignore', apiOut, apiErr] })
   const webProc = spawn('pnpm', ['-w', '-F', '@intellispense/web-next', 'start'], { env: { ...process.env, NEXT_PUBLIC_API_URL: 'http://localhost:4000', PORT: '3001' }, detached: false, stdio: ['ignore', webOut, webErr] })
 
+  function killProc(proc) {
+    try {
+      if (proc && proc.pid) process.kill(proc.pid)
+    } catch (e) {
+      // best-effort cleanup
+    }
+  }
+
   // Give servers time to boot and check health endpoints
   const maxAttempts = 60
   const wait = ms => new Promise(r => setTimeout(r, ms))
@@ -96,6 +99,8 @@ module.exports = async () => {
   }
   if (!apiReady) {
     console.error('Servers failed to start; check e2e/logs for details')
+    killProc(apiProc)
+    killProc(webProc)
     process.exit(1)
   }
 

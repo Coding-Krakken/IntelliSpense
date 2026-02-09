@@ -45,7 +45,17 @@ export async function createEvent(payload: any) {
   }
 }
 
-export async function login(email: string, organizationSlug?: string) {
-  const res = await axios.post(`${API_URL}/api/login`, { email, organizationSlug })
+export async function login(
+  email: string,
+  options?: {
+    password?: string
+    organizationSlug?: string
+  }
+) {
+  const res = await axios.post(`${API_URL}/api/login`, {
+    email,
+    password: options?.password,
+    organizationSlug: options?.organizationSlug
+  })
   return res.data
 }

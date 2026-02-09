@@ -21,8 +21,6 @@ declare global {
   }
 }
 
-dotenv.config()
-
 const app = express()
 app.use(cors({ origin: process.env.WEB_ORIGIN || 'http://localhost:3001', credentials: true }))
 app.use(express.json())
@@ -39,7 +37,15 @@ app.use((req, _res, next) => {
 })
 
 const port = Number(process.env.API_PORT || 4000)
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
+const rawJwtSecret = process.env.JWT_SECRET || 'dev-secret'
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret') {
+    throw new Error('Configuration error: JWT_SECRET must be set to a strong, non-default value in production.')
+  }
+}
+
+const JWT_SECRET = rawJwtSecret
 const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '15m'
 const REFRESH_TOKEN_TTL_MS = Number(process.env.REFRESH_TOKEN_TTL_MS || String(7 * 24 * 60 * 60 * 1000))
 
@@ -223,11 +229,18 @@ const CreateEventSchema = z.object({
   description: z.string().optional()
 })
 
-app.post('/api/events', requireAuth, express.json(), async (req, res) => {
+app.post('/api/events', requireAuth, async (req, res) => {
   try {
     const parsed = CreateEventSchema.parse(req.body)
     const orgId = req.user!.organizationId
     const userId = req.user!.id
+
+    if (parsed.projectId) {
+      const project = await db.project.findUnique({ where: { id: parsed.projectId } })
+      if (!project || project.organizationId !== orgId) {
+        return res.status(404).json({ error: 'project not found' })
+      }
+    }
 
     // Span for event ingestion
     const eventsTracer = trace.getTracer('intellispense-events')
@@ -347,14 +360,19 @@ app.delete('/api/projects/:id', requireAuth, async (req, res) => {
   }
 })
 
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API server listening on http://localhost:${port}`)
-})
+export { app }
 
-// Start background jobs
-import { startPruneJob } from './jobs/pruneRefreshTokens'
-const pruneInterval = startPruneJob()
-process.on('SIGTERM', () => {
-  if (pruneInterval) clearInterval(pruneInterval)
-})
+if (require.main === module) {
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`API server listening on http://localhost:${port}`)
+  })
+
+  // Start background jobs
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { startPruneJob } = require('./jobs/pruneRefreshTokens')
+  const pruneInterval = startPruneJob()
+  process.on('SIGTERM', () => {
+    if (pruneInterval) clearInterval(pruneInterval)
+  })
+}

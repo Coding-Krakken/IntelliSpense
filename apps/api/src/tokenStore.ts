@@ -1,12 +1,24 @@
-// optional native dependency used only for local SQLite fallback — skip
-// TypeScript resolution in CI
-// @ts-ignore: optional dependency
-import Database from 'better-sqlite3'
 import path from 'path'
+import { mkdirSync } from 'fs'
+
+function loadBetterSqlite3(): any {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('better-sqlite3')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `SQLite refresh-token fallback requires optional dependency "better-sqlite3". ` +
+        `Install it (or set USE_PRISMA_REFRESH=true). Original error: ${message}`
+    )
+  }
+}
 
 const dbPath = process.env.REFRESH_SQLITE_PATH || path.join(process.cwd(), 'data', 'refresh_tokens.sqlite')
-const mkdirp = require('fs').mkdirSync
-mkdirp(path.dirname(dbPath), { recursive: true })
+
+mkdirSync(path.dirname(dbPath), { recursive: true })
+
+const Database = loadBetterSqlite3()
 
 const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')

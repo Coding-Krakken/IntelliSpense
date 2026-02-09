@@ -10,15 +10,21 @@ module.exports = async () => {
 
   try {
     if (artifacts.apiPid) process.kill(artifacts.apiPid)
-  } catch (e) {}
+  } catch (e) {
+    console.error('E2E global-teardown: failed to kill apiPid', e)
+  }
   try {
     if (artifacts.webPid) process.kill(artifacts.webPid)
-  } catch (e) {}
+  } catch (e) {
+    console.error('E2E global-teardown: failed to kill webPid', e)
+  }
 
   // Tear down docker-compose services if present
   try {
     execSync('docker-compose -f docker-compose.dev.yml down', { stdio: 'inherit' })
-  } catch (e) {}
+  } catch (e) {
+    console.error('E2E global-teardown: docker-compose down failed', e)
+  }
 
   fs.unlinkSync(artifactsPath)
   console.log('E2E global-teardown: cleaned up')
