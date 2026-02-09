@@ -5,16 +5,66 @@ const { spawnSync, spawn } = require('child_process')
 module.exports = async () => {
   const root = process.cwd()
   const artifactsPath = path.join(root, 'e2e', 'artifacts.json')
+  const logsDir = path.join(root, 'e2e', 'logs')
+  fs.mkdirSync(logsDir, { recursive: true })
+  const setupLogPath = path.join(logsDir, 'setup.log')
+  const setupLog = fs.openSync(setupLogPath, 'a')
   console.log('E2E global-setup: starting Postgres and Redis using docker compose')
 
-  // Prefer `docker compose` (modern CLI). Fall back to `docker-compose` if not available.
-  let up = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--remove-orphans'], { stdio: 'inherit' })
-  if (up.status !== 0) {
-    console.warn('`docker compose` failed, falling back to `docker-compose`')
-    up = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', 'up', '-d', '--remove-orphans'], { stdio: 'inherit' })
+  function logLine(line) {
+    try {
+      fs.writeSync(setupLog, `${new Date().toISOString()} ${line}\n`)
+    } catch {
+      // best-effort
+    }
   }
-  if (up.status !== 0) {
+
+  function runComposeSync(args, options = {}) {
+    const res = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', ...args], {
+      ...options,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    if (res.status !== 0) {
+      const fallback = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', ...args], {
+        ...options,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+      return { ...fallback, usedFallback: true }
+    }
+    return { ...res, usedFallback: false }
+  }
+
+  function looksLikePortCollision(stderr) {
+    const s = String(stderr || '')
+    return /port is already allocated|address already in use|Bind for/i.test(s)
+  }
+
+  function randomPort(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+
+  // Choose host ports (configurable via env; retry with random high ports if in use).
+  let pgPort = Number(process.env.POSTGRES_PORT || 5432)
+  let redisPort = Number(process.env.REDIS_PORT || 6379)
+  let up
+  for (let attempt = 0; attempt < 5; attempt++) {
+    process.env.POSTGRES_PORT = String(pgPort)
+    process.env.REDIS_PORT = String(redisPort)
+    logLine(`docker compose up attempt=${attempt + 1} POSTGRES_PORT=${pgPort} REDIS_PORT=${redisPort}`)
+    up = runComposeSync(['up', '-d', '--remove-orphans'])
+    if (up.stdout) process.stdout.write(up.stdout)
+    if (up.stderr) process.stderr.write(up.stderr)
+    if (up.status === 0) break
+    if (!looksLikePortCollision(up.stderr)) break
+    pgPort = randomPort(20000, 40000)
+    redisPort = randomPort(20000, 40000)
+  }
+  if (!up || up.status !== 0) {
     console.error('docker compose / docker-compose up failed')
+    logLine(`docker compose up failed status=${up ? up.status : 'unknown'}`)
+    if (up && up.stderr) logLine(String(up.stderr).slice(0, 4000))
     process.exit(1)
   }
 
@@ -43,8 +93,8 @@ module.exports = async () => {
 
   // Wait briefly for services to be reachable on localhost
   const pgHost = 'localhost'
-  const pgPort = Number(process.env.POSTGRES_PORT || 5432)
   const DATABASE_URL = `postgresql://intellispense:intellispense_dev_password@${pgHost}:${pgPort}/intellispense_dev`
+  console.log(`E2E global-setup: using DATABASE_URL=${DATABASE_URL}`)
 
   // Run migrations (use deploy for deterministic, non-interactive behavior)
   if (process.env.SKIP_DB_MIGRATIONS === 'true') {
@@ -73,9 +123,6 @@ module.exports = async () => {
 
   // Start API and web servers (capture logs)
   console.log('E2E global-setup: starting API and web')
-  const logsDir = path.join(root, 'e2e', 'logs')
-  fs.mkdirSync(logsDir, { recursive: true })
-
   const apiOut = fs.openSync(path.join(logsDir, 'api.out.log'), 'a')
   const apiErr = fs.openSync(path.join(logsDir, 'api.err.log'), 'a')
   const webOut = fs.openSync(path.join(logsDir, 'web.out.log'), 'a')
