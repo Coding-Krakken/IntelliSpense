@@ -44,6 +44,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
       - name: Run Playwright E2E
+        env:
+          POSTGRES_PORT: 15432
+          REDIS_PORT: 16379
         run: pnpm e2e
       - name: Upload E2E artifacts
         if: failure() || always()

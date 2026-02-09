@@ -8,10 +8,10 @@ module.exports = async () => {
   console.log('E2E global-setup: starting Postgres and Redis using docker compose')
 
   // Prefer `docker compose` (modern CLI). Fall back to `docker-compose` if not available.
-  let up = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d'], { stdio: 'inherit' })
+  let up = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--remove-orphans'], { stdio: 'inherit' })
   if (up.status !== 0) {
     console.warn('`docker compose` failed, falling back to `docker-compose`')
-    up = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', 'up', '-d'], { stdio: 'inherit' })
+    up = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', 'up', '-d', '--remove-orphans'], { stdio: 'inherit' })
   }
   if (up.status !== 0) {
     console.error('docker compose / docker-compose up failed')
@@ -43,7 +43,7 @@ module.exports = async () => {
 
   // Wait briefly for services to be reachable on localhost
   const pgHost = 'localhost'
-  const pgPort = 5432
+  const pgPort = Number(process.env.POSTGRES_PORT || 5432)
   const DATABASE_URL = `postgresql://intellispense:intellispense_dev_password@${pgHost}:${pgPort}/intellispense_dev`
 
   // Run migrations (use deploy for deterministic, non-interactive behavior)
