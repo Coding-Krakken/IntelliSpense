@@ -18,6 +18,29 @@ module.exports = async () => {
     process.exit(1)
   }
 
+  // Wait for Postgres to be ready before running migrations.
+  console.log('E2E global-setup: waiting for Postgres readiness')
+  function runCompose(args) {
+    let res = spawnSync('docker', ['compose', '-f', 'docker-compose.dev.yml', ...args], { stdio: 'inherit' })
+    if (res.status !== 0) {
+      res = spawnSync('docker-compose', ['-f', 'docker-compose.dev.yml', ...args], { stdio: 'inherit' })
+    }
+    return res
+  }
+  let pgReady = false
+  for (let i = 0; i < 60; i++) {
+    const check = runCompose(['exec', '-T', 'postgres', 'pg_isready', '-U', 'intellispense'])
+    if (check.status === 0) {
+      pgReady = true
+      break
+    }
+    await new Promise(r => setTimeout(r, 1000))
+  }
+  if (!pgReady) {
+    console.error('Postgres failed to become ready in time')
+    process.exit(1)
+  }
+
   // Wait briefly for services to be reachable on localhost
   const pgHost = 'localhost'
   const pgPort = 5432
@@ -58,7 +81,7 @@ module.exports = async () => {
   const webOut = fs.openSync(path.join(logsDir, 'web.out.log'), 'a')
   const webErr = fs.openSync(path.join(logsDir, 'web.err.log'), 'a')
 
-  const apiProc = spawn('pnpm', ['-w', '-F', '@intellispense/api', 'start'], { env: { ...process.env, DATABASE_URL, PORT: '4000' }, detached: false, stdio: ['ignore', apiOut, apiErr] })
+  const apiProc = spawn('pnpm', ['-w', '-F', '@intellispense/api', 'start'], { env: { ...process.env, DATABASE_URL, API_PORT: '4000' }, detached: false, stdio: ['ignore', apiOut, apiErr] })
   const webProc = spawn('pnpm', ['-w', '-F', '@intellispense/web-next', 'start'], { env: { ...process.env, NEXT_PUBLIC_API_URL: 'http://localhost:4000', PORT: '3001' }, detached: false, stdio: ['ignore', webOut, webErr] })
 
   function killProc(proc) {

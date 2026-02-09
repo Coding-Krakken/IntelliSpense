@@ -21,7 +21,11 @@ module.exports = async () => {
 
   // Tear down docker-compose services if present
   try {
-    execSync('docker-compose -f docker-compose.dev.yml down', { stdio: 'inherit' })
+    try {
+      execSync('docker compose -f docker-compose.dev.yml down', { stdio: 'inherit' })
+    } catch (e) {
+      execSync('docker-compose -f docker-compose.dev.yml down', { stdio: 'inherit' })
+    }
   } catch (e) {
     console.error('E2E global-teardown: docker-compose down failed', e)
   }
