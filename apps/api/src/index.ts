@@ -163,16 +163,23 @@ app.get('/api/docs', (_req, res) => {
 
 // Example endpoint used by the demo UI
 const tracer = trace.getTracer('intellispense-api')
-app.get('/api/profitability', async (_req, res) => {
+const ProfitabilityQuerySchema = z.object({
+  projectId: z.string().uuid().optional()
+})
+
+app.get('/api/profitability', requireAuth, async (req, res) => {
   return tracer.startActiveSpan('calculate-profitability', async (span) => {
     try {
+      const { projectId } = ProfitabilityQuerySchema.parse(req.query)
+      const orgId = req.user!.organizationId
+
       const revenueAgg = await db.financialEvent.aggregate({
         _sum: { amount: true },
-        where: { eventType: 'REVENUE' }
+        where: { organizationId: orgId, projectId, eventType: 'REVENUE' }
       })
       const costsAgg = await db.financialEvent.aggregate({
         _sum: { amount: true },
-        where: { NOT: { eventType: 'REVENUE' } }
+        where: { organizationId: orgId, projectId, NOT: { eventType: 'REVENUE' } }
       })
 
       const revenue = Number(revenueAgg._sum.amount ?? 0)
@@ -187,7 +194,7 @@ app.get('/api/profitability', async (_req, res) => {
       res.json({ revenue, costs, margin, marginPercent })
     } catch (e: any) {
       span.recordException(e)
-      res.json({ revenue: 100000, costs: 42000, margin: 58000, marginPercent: 58, warning: 'db-unavailable' })
+      res.status(400).json({ error: e.message })
     } finally {
       span.end()
     }
