@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, feature/*, feature/reference-stack ]
+  pull_request:
+    branches: [ main, feature/*, feature/reference-stack ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@8.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: postgresql://intellispense:intellispense_dev_password@localhost:5432/intellispense_dev
+        run: pnpm -w -F @intellispense/database db:generate
+      - name: Run lint and typecheck
+        run: pnpm -w -r run typecheck
+      - name: Build packages
+        run: pnpm -w -r run build
+      - name: Run unit tests
+        run: pnpm -w test
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright E2E
+        env:
+          POSTGRES_PORT: 15432
+          REDIS_PORT: 16379
+        run: pnpm e2e
+      - name: Upload E2E artifacts
+        if: failure() || always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            e2e/logs
+            test-results

@@ -17,6 +17,9 @@ datasource db {
   provider = "postgresql"
 }
 
+// NOTE: Prisma v7 moves runtime datasource configuration out of the schema.
+// Provide `DATABASE_URL` via `packages/database/prisma.config.ts` (or env).
+
 // =================================================================
 // ORGANIZATIONS & USERS
 // =================================================================
@@ -69,9 +72,26 @@ model User {
   createdEvents   FinancialEvent[]  @relation("EventCreator")
   managedProjects Project[]         @relation("ProjectManager")
   auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
 
   @@index([email])
   @@map("users")
+}
+
+// Refresh tokens for long-lived sessions. Stored hashed for safety.
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  replacedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model OrganizationMembership {

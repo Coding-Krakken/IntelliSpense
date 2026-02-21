@@ -19,6 +19,8 @@ IntelliSpense eliminates Excel-based profitability tracking for project-based bu
 - **Offline-First:** Full functionality without internet connection
 - **Multi-Platform:** Web, desktop, mobile, CLI
 
+<!-- ci-trigger: re-run CI to validate migrations -->
+
 ### Target Users
 - Solo operators & micro-businesses (1-5 employees)
 - Small businesses (5-50 employees)
@@ -41,7 +43,7 @@ IntelliSpense eliminates Excel-based profitability tracking for project-based bu
 
 ```bash
 # Clone the repository
-git clone https://github.com/intellispense/intellispense.git
+git clone https://github.com/Intellispense.git
 cd intellispense
 
 # Install dependencies
