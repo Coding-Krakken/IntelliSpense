@@ -222,6 +222,9 @@ app.get('/api/projects/:id', requireAuth, async (req, res) => {
   res.json(project)
 })
 
+// projectId is optional to support organization-level events (e.g., OVERHEAD_COST for
+// general overhead not attributable to a specific project). Project-specific events
+// should always include a projectId for accurate profitability calculations.
 const CreateEventSchema = z.object({
   projectId: z.string().uuid().optional(),
   eventType: z.enum(["REVENUE", "LABOR_COST", "MATERIAL_COST", "OVERHEAD_COST", "EQUIPMENT_COST", "SUBCONTRACTOR_COST", "ADJUSTMENT", "FORECAST"]),

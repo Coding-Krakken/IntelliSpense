@@ -9,13 +9,13 @@ const port = Number(process.env.WEB_PORT || 3000)
 app.get('/', async (_req, res) => {
   const apiUrl = process.env.API_URL || 'http://localhost:4000'
   // Try to fetch API health for a small demo
-  let apiHealth = 'unavailable'
+  let apiHealth: string
   try {
     const r = await fetch(`${apiUrl}/api/health`)
     const json = await r.json()
     apiHealth = JSON.stringify(json)
-  } catch (e) {
-    apiHealth = 'error'
+  } catch {
+    apiHealth = 'unavailable'
   }
 
   res.send(`

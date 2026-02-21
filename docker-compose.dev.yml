@@ -1,10 +1,16 @@
 version: '3.8'
 
-# Development-only services. Credentials and ports here must not be used for production.
+# ===================================================================
+# DEVELOPMENT-ONLY SERVICES
+# ===================================================================
+# WARNING: The credentials below are for LOCAL DEVELOPMENT and E2E tests ONLY.
+# Do NOT use these credentials in production environments.
+# ===================================================================
 services:
   postgres:
     image: postgres:15
     environment:
+      # DEV-ONLY CREDENTIALS - never use in production
       POSTGRES_USER: intellispense
       POSTGRES_PASSWORD: intellispense_dev_password
       POSTGRES_DB: intellispense_dev
